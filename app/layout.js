@@ -1,4 +1,5 @@
 import './globals.css';
+import { AuthProvider } from '@/components/AuthProvider';
 
 export const metadata = {
   title: 'SWD Predictive Tool | Scale with Data',
@@ -12,7 +13,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className="min-h-screen">
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

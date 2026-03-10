@@ -2,18 +2,16 @@
 
 import { useState } from 'react';
 import Nav from '@/components/Nav';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import ChannelBaseline from '@/components/ChannelBaseline';
 import PostPredictionResult from '@/components/PostPredictionResult';
-import { CONTENT_CATEGORIES, FORMAT_TYPES, CHECKPOINT_OPTIONS, TRAFFIC_SOURCES } from '@/lib/constants';
+import { useAuth } from '@/components/AuthProvider';
+import { savePrediction, getActiveProfileId } from '@/lib/db';
+import { FORMAT_TYPES, CHECKPOINT_OPTIONS, TRAFFIC_SOURCES, CONTENT_CATEGORIES } from '@/lib/constants';
 
 const DEFAULT_BASELINE = {
-  channelName: '',
-  subscribers: '',
-  avgViews: '',
-  avgCTR: '',
-  avgRetention: '',
-  uploadFrequency: '',
-  category: CONTENT_CATEGORIES[0],
-  channelAge: '',
+  channelName: '', subscribers: '', avgViews: '', avgCTR: '',
+  avgRetention: '', uploadFrequency: '', category: CONTENT_CATEGORIES[0], channelAge: '',
 };
 
 const DEFAULT_VIDEO = {
@@ -36,6 +34,15 @@ const DEFAULT_PERFORMANCE = {
 };
 
 export default function PostPublishPage() {
+  return (
+    <ProtectedRoute>
+      <PostPublishContent />
+    </ProtectedRoute>
+  );
+}
+
+function PostPublishContent() {
+  const { user } = useAuth();
   const [baseline, setBaseline] = useState(DEFAULT_BASELINE);
   const [video, setVideo] = useState(DEFAULT_VIDEO);
   const [performance, setPerformance] = useState(DEFAULT_PERFORMANCE);
@@ -43,7 +50,6 @@ export default function PostPublishPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const updateBaseline = (field, value) => setBaseline(prev => ({ ...prev, [field]: value }));
   const updateVideo = (field, value) => setVideo(prev => ({ ...prev, [field]: value }));
   const updatePerformance = (field, value) => setPerformance(prev => ({ ...prev, [field]: value }));
 
@@ -76,6 +82,19 @@ export default function PostPublishPage() {
       if (!res.ok) throw new Error(data.error || 'Prediction failed');
 
       setResult(data.prediction);
+
+      // Save to database
+      if (user) {
+        const profileId = await getActiveProfileId(user.id);
+        await savePrediction({
+          userId: user.id,
+          channelProfileId: profileId,
+          mode: 'post-publish',
+          video,
+          performance,
+          prediction: data.prediction,
+        });
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -88,7 +107,6 @@ export default function PostPublishPage() {
       <Nav />
       <main className="min-h-screen pt-24 pb-20 px-6">
         <div className="max-w-3xl mx-auto">
-          {/* Header */}
           <div className="mb-10 animate-fade-in">
             <h1 className="text-3xl font-bold text-white mb-2">Post-Publish Prediction</h1>
             <p className="text-neutral-400">
@@ -96,25 +114,8 @@ export default function PostPublishPage() {
             </p>
           </div>
 
-          {/* Channel Baseline */}
-          <section className="mb-8 animate-fade-in" style={{ animationDelay: '0.05s', animationFillMode: 'backwards' }}>
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-8 h-8 rounded-lg bg-brand-green/15 flex items-center justify-center text-brand-green text-sm font-bold">1</div>
-              <h2 className="text-lg font-semibold text-white">Channel Baseline</h2>
-            </div>
-            <div className="rounded-xl bg-surface-secondary border border-surface-border p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField label="Channel Name" value={baseline.channelName} onChange={v => updateBaseline('channelName', v)} placeholder="e.g. Grow with Spencer" />
-                <InputField label="Subscribers" value={baseline.subscribers} onChange={v => updateBaseline('subscribers', v)} placeholder="e.g. 5000" type="number" />
-                <InputField label="Avg Views / Video (last 20)" value={baseline.avgViews} onChange={v => updateBaseline('avgViews', v)} placeholder="e.g. 1200" type="number" />
-                <InputField label="Avg CTR (%)" value={baseline.avgCTR} onChange={v => updateBaseline('avgCTR', v)} placeholder="e.g. 5.5" type="number" step="0.1" />
-                <InputField label="Avg Retention / AVD (%)" value={baseline.avgRetention} onChange={v => updateBaseline('avgRetention', v)} placeholder="e.g. 42" type="number" step="0.1" />
-                <InputField label="Upload Frequency (videos/month)" value={baseline.uploadFrequency} onChange={v => updateBaseline('uploadFrequency', v)} placeholder="e.g. 4" type="number" />
-                <SelectField label="Primary Category" value={baseline.category} onChange={v => updateBaseline('category', v)} options={CONTENT_CATEGORIES.map(c => ({ value: c, label: c }))} />
-                <InputField label="Channel Age (months)" value={baseline.channelAge} onChange={v => updateBaseline('channelAge', v)} placeholder="e.g. 18" type="number" />
-              </div>
-            </div>
-          </section>
+          {/* Channel Baseline — with save/load */}
+          <ChannelBaseline baseline={baseline} setBaseline={setBaseline} />
 
           {/* Video Details */}
           <section className="mb-8 animate-fade-in" style={{ animationDelay: '0.1s', animationFillMode: 'backwards' }}>
@@ -143,7 +144,6 @@ export default function PostPublishPage() {
               <h2 className="text-lg font-semibold text-white">Early Performance Data</h2>
             </div>
             <div className="rounded-xl bg-surface-secondary border border-surface-border p-6">
-              {/* Checkpoint Selector */}
               <div className="mb-5">
                 <label className="block text-sm text-neutral-400 mb-2">Time Since Publish</label>
                 <div className="flex gap-2">
@@ -177,7 +177,7 @@ export default function PostPublishPage() {
           </section>
 
           {/* Submit */}
-          <div className="animate-fade-in" style={{ animationDelay: '0.2s', animationFillMode: 'backwards' }}>
+          <div>
             {error && (
               <div className="mb-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
                 {error}
@@ -200,7 +200,6 @@ export default function PostPublishPage() {
             </button>
           </div>
 
-          {/* Results */}
           {loading && (
             <div className="mt-8 space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -223,20 +222,14 @@ export default function PostPublishPage() {
 }
 
 
-/* ─── Reusable Form Components ─── */
+/* ─── Form Components ─── */
 
 function InputField({ label, value, onChange, placeholder, type = 'text', step }) {
   return (
     <div>
       <label className="block text-sm text-neutral-400 mb-1.5">{label}</label>
-      <input
-        type={type}
-        step={step}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-4 py-2.5 rounded-lg bg-surface-tertiary border border-surface-border text-white text-sm placeholder-neutral-600 focus:outline-none focus:border-brand-green/50 transition-colors"
-      />
+      <input type={type} step={step} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        className="w-full px-4 py-2.5 rounded-lg bg-surface-tertiary border border-surface-border text-white text-sm placeholder-neutral-600 focus:outline-none focus:border-brand-green/50 transition-colors" />
     </div>
   );
 }
@@ -245,13 +238,8 @@ function TextAreaField({ label, value, onChange, placeholder, rows = 3 }) {
   return (
     <div>
       <label className="block text-sm text-neutral-400 mb-1.5">{label}</label>
-      <textarea
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        rows={rows}
-        className="w-full px-4 py-2.5 rounded-lg bg-surface-tertiary border border-surface-border text-white text-sm placeholder-neutral-600 focus:outline-none focus:border-brand-green/50 transition-colors resize-none"
-      />
+      <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={rows}
+        className="w-full px-4 py-2.5 rounded-lg bg-surface-tertiary border border-surface-border text-white text-sm placeholder-neutral-600 focus:outline-none focus:border-brand-green/50 transition-colors resize-none" />
     </div>
   );
 }
@@ -260,12 +248,9 @@ function SelectField({ label, value, onChange, options }) {
   return (
     <div>
       <label className="block text-sm text-neutral-400 mb-1.5">{label}</label>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
+      <select value={value} onChange={e => onChange(e.target.value)}
         className="w-full px-4 py-2.5 rounded-lg bg-surface-tertiary border border-surface-border text-white text-sm focus:outline-none focus:border-brand-green/50 transition-colors appearance-none"
-        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
-      >
+        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}>
         {options.map(opt => {
           const val = typeof opt === 'string' ? opt : opt.value;
           const lab = typeof opt === 'string' ? opt : opt.label;

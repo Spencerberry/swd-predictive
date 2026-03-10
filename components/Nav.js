@@ -1,10 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
 
 export default function Nav() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push('/auth');
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-surface-border"
@@ -47,6 +55,25 @@ export default function Nav() {
           >
             Post-Publish
           </Link>
+          <Link
+            href="/history"
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+              pathname === '/history'
+                ? 'bg-brand-green/15 text-brand-green'
+                : 'text-neutral-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            History
+          </Link>
+
+          {user && (
+            <button
+              onClick={handleSignOut}
+              className="ml-3 px-4 py-2 rounded-lg text-sm font-medium text-neutral-500 hover:text-white hover:bg-white/5 transition-all duration-200"
+            >
+              Sign Out
+            </button>
+          )}
         </div>
       </div>
     </nav>
