@@ -36,6 +36,16 @@ export default function Nav() {
 
         <div className="flex items-center gap-1">
           <Link
+            href="/ideas"
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+              pathname === '/ideas'
+                ? 'bg-brand-green/15 text-brand-green'
+                : 'text-neutral-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            Ideas
+          </Link>
+          <Link
             href="/pre-publish"
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
               pathname === '/pre-publish'
